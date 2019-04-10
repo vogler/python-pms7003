@@ -52,9 +52,15 @@ import time
 
 import serial
 
-physicalPort = 'COM3'
+physicalPort = '/dev/serial0'
 
 serialPort = serial.Serial(physicalPort)  # open serial port
+
+import paho.mqtt.client as mqtt
+client = mqtt.Client()
+client.connect("localhost")
+client.loop_start()
+import json
 
 while True:
     # Check if we have enough data to read a payload
@@ -94,7 +100,7 @@ while True:
                 inputChecksum = inputChecksum + data[x]
 
             # Clear the screen before displaying the next set of data
-            os.system('cls')  # Set to 'cls' on Windows, 'clear' on linux
+            os.system('clear')  # Set to 'cls' on Windows, 'clear' on linux
             print("PMS7003 Sensor Data:")
             print("PM1.0 = " + str(concPM1_0_CF1) + " ug/m3")
             print("PM2.5 = " + str(concPM2_5_CF1) + " ug/m3")
@@ -111,6 +117,18 @@ while True:
             print("Version = " + str(version))
             print("Error Code = " + str(errorCode))
             print("Frame length = " + str(frameLength))
+            d = {
+                "PM1.0": concPM1_0_CF1,
+                "PM2.5": concPM2_5_CF1,
+                "PM10":  concPM10_0_CF1,
+                "Count0.3": rawGt0_3um,
+                "Count0.5": rawGt0_5um,
+                "Count1.0": rawGt1_0um,
+                "Count2.5": rawGt2_5um,
+                "Count5.0": rawGt5_0um,
+                "Count10":  rawGt10_0um
+            }
+            client.publish("sensors/pms7003", json.dumps(d))
             if inputChecksum != payloadChecksum:
                 print("Warning! Checksums don't match!")
                 print("Calculated Checksum = " + str(inputChecksum))
