@@ -50,17 +50,23 @@ SOFTWARE.
 import os
 import time
 
+import argparse
+parser = argparse.ArgumentParser(description='return particle mass and count measured by PMS7003 sensor')
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--noprint", help="do not print data (default is to print and clear screen)", action="store_true")
+group.add_argument("--nomqtt", help="do not publish data via mqtt to localhost", action="store_true")
+args = parser.parse_args()
+
 import serial
-
 physicalPort = '/dev/serial0'
-
 serialPort = serial.Serial(physicalPort)  # open serial port
 
-import paho.mqtt.client as mqtt
-client = mqtt.Client()
-client.connect("localhost")
-client.loop_start()
-import json
+if not args.nomqtt:
+    import paho.mqtt.client as mqtt
+    client = mqtt.Client()
+    client.connect("localhost")
+    client.loop_start()
+    import json
 
 while True:
     # Check if we have enough data to read a payload
@@ -99,38 +105,43 @@ while True:
             for x in range(0, 27):
                 inputChecksum = inputChecksum + data[x]
 
-            # Clear the screen before displaying the next set of data
-            os.system('clear')  # Set to 'cls' on Windows, 'clear' on linux
-            print("PMS7003 Sensor Data:")
-            print("PM1.0 = " + str(concPM1_0_CF1) + " ug/m3")
-            print("PM2.5 = " + str(concPM2_5_CF1) + " ug/m3")
-            print("PM10 = " + str(concPM10_0_CF1) + " ug/m3")
-            print("PM1 Atmospheric concentration = " + str(concPM1_0_ATM) + " ug/m3")
-            print("PM2.5 Atmospheric concentration = " + str(concPM2_5_ATM) + " ug/m3")
-            print("PM10 Atmospheric concentration = " + str(concPM10_0_ATM) + " ug/m3")
-            print("Count: 0.3um = " + str(rawGt0_3um) + " per 0.1l")
-            print("Count: 0.5um = " + str(rawGt0_5um) + " per 0.1l")
-            print("Count: 1.0um = " + str(rawGt1_0um) + " per 0.1l")
-            print("Count: 2.5um = " + str(rawGt2_5um) + " per 0.1l")
-            print("Count: 5.0um = " + str(rawGt5_0um) + " per 0.1l")
-            print("Count: 10um = " + str(rawGt10_0um) + " per 0.1l")
-            print("Version = " + str(version))
-            print("Error Code = " + str(errorCode))
-            print("Frame length = " + str(frameLength))
-            d = {
-                "PM1.0": concPM1_0_CF1,
-                "PM2.5": concPM2_5_CF1,
-                "PM10":  concPM10_0_CF1,
-                "Count0.3": rawGt0_3um,
-                "Count0.5": rawGt0_5um,
-                "Count1.0": rawGt1_0um,
-                "Count2.5": rawGt2_5um,
-                "Count5.0": rawGt5_0um,
-                "Count10":  rawGt10_0um
-            }
-            client.publish("sensors/pms7003", json.dumps(d))
+            if not args.noprint:
+                # Clear the screen before displaying the next set of data
+                os.system('clear')  # Set to 'cls' on Windows, 'clear' on linux
+                print("PMS7003 Sensor Data:")
+                print("PM1.0 = " + str(concPM1_0_CF1) + " ug/m3")
+                print("PM2.5 = " + str(concPM2_5_CF1) + " ug/m3")
+                print("PM10 = " + str(concPM10_0_CF1) + " ug/m3")
+                print("PM1 Atmospheric concentration = " + str(concPM1_0_ATM) + " ug/m3")
+                print("PM2.5 Atmospheric concentration = " + str(concPM2_5_ATM) + " ug/m3")
+                print("PM10 Atmospheric concentration = " + str(concPM10_0_ATM) + " ug/m3")
+                print("Count: 0.3um = " + str(rawGt0_3um) + " per 0.1l")
+                print("Count: 0.5um = " + str(rawGt0_5um) + " per 0.1l")
+                print("Count: 1.0um = " + str(rawGt1_0um) + " per 0.1l")
+                print("Count: 2.5um = " + str(rawGt2_5um) + " per 0.1l")
+                print("Count: 5.0um = " + str(rawGt5_0um) + " per 0.1l")
+                print("Count: 10um = " + str(rawGt10_0um) + " per 0.1l")
+                print("Version = " + str(version))
+                print("Error Code = " + str(errorCode))
+                print("Frame length = " + str(frameLength))
+
+            # checksum errors should go into the log even if --noprint
             if inputChecksum != payloadChecksum:
                 print("Warning! Checksums don't match!")
                 print("Calculated Checksum = " + str(inputChecksum))
                 print("Payload checksum = " + str(payloadChecksum))
+
+            if not args.nomqtt:
+                d = {
+                    "PM1.0": concPM1_0_CF1,
+                    "PM2.5": concPM2_5_CF1,
+                    "PM10":  concPM10_0_CF1,
+                    "Count0.3": rawGt0_3um,
+                    "Count0.5": rawGt0_5um,
+                    "Count1.0": rawGt1_0um,
+                    "Count2.5": rawGt2_5um,
+                    "Count5.0": rawGt5_0um,
+                    "Count10":  rawGt10_0um
+                }
+                client.publish("sensors/pms7003", json.dumps(d))
     time.sleep(0.7)  # Maximum recommended delay (as per data sheet)
